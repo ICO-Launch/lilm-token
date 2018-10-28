@@ -1,5 +1,5 @@
 const Proxy = artifacts.require('./Proxy.sol');
-const Controller = artifacts.require('./Controller.sol');
+const Controller = artifacts.require('./LockedToken.sol');
 
 const decimals = 18;
 const initCap = 10000000000000;
@@ -15,6 +15,8 @@ module.exports = async function(deployer) {
     let token = Controller.at(proxy.address);
     // use binding
     await token.initialize(controller.address, initCap*(10**decimals));
+    // saleLock enabled
+    await token.setSaleLock(true);
     // check result
     let cap = await token.cap();
     console.log(cap.toNumber());

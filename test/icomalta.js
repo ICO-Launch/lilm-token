@@ -8,8 +8,8 @@ const chaiAsPromised = require('chai-as-promised');
 const should = chai.should();
 chai.use(chaiAsPromised);
 
-const name = "COIN";
-const symbol = "COIN";
+const name = "Locked ILM token";
+const symbol = "LILM";
 const decimals = 18;
 const initCap = 400000000;
 
@@ -226,6 +226,169 @@ contract('Proxy', (accounts) => {
     await token.initialize(controller.address, 200);
     let originalOwner = await token.owner();
     await token.transferOwnership(null, { from: originalOwner }).should.be.rejectedWith('revert');
+  });
+
+  it('only the owner can lock/unlock the sale', async function () {
+    // initialize contract
+    await token.initialize(controller.address, 100);
+    // try to lock by non-owner should be rejected
+    await token.setSaleLock(true, { from: accounts[1] }).should.be.rejectedWith('revert');
+    // try to unlock when already unlocked should be rejected
+    await token.setSaleLock(false).should.be.rejectedWith('revert');
+    // saleLock enabled by owner
+    await token.setSaleLock(true);
+    // try to unlock by non-owner should be rejected
+    await token.setSaleLock(false, { from: accounts[1] }).should.be.rejectedWith('revert');
+  });
+
+  it('only the owner can set saleAddr', async function () {
+    // initialize contract
+    await token.initialize(controller.address, 100);
+    //check saleAddr is 0 at the begining
+    let saleAddr = await token.saleAddr();
+    assert.equal(saleAddr, 0);
+    // try to set by non-owner should be rejected
+    await token.setSaleAddr(accounts[1], { from: accounts[1] }).should.be.rejectedWith('revert');
+    // set saleAddr by owner
+    await token.setSaleAddr(accounts[1]);
+    saleAddr = await token.saleAddr();
+    assert.equal(saleAddr, accounts[1]);
+    // try to set again to same saleAddr should be rejected
+    await token.setSaleAddr(accounts[1]).should.be.rejectedWith('revert');
+    // but modifying it is not allowed...
+    await token.setSaleAddr(accounts[2], { from: accounts[1] }).should.be.rejectedWith('revert');
+    // unless by the token owner
+    await token.setSaleAddr(accounts[2]);
+    saleAddr = await token.saleAddr();
+    assert.equal(saleAddr, accounts[2]);
+  });
+
+  it('should allow the owner to transfer while sale locked', async function () {
+    // initialize contract
+    await token.initialize(controller.address, 100);
+    // saleLock enabled
+    await token.setSaleLock(true);
+    // mint some tokens
+    const result = await token.mint(accounts[0], 100);
+    // validate balance
+    let balance0 = await token.balanceOf(accounts[0]);
+    assert.equal(balance0.toNumber(), 100);
+    // try to send from owner should work
+    await token.transfer(accounts[1], 100);
+    // validate balance
+    let balance = await token.balanceOf(accounts[1]);
+    assert.equal(balance.toNumber(), 100);
+  });
+
+  it('should not allow non-owners to transfer while sale locked', async function () {
+    // initialize contract
+    await token.initialize(controller.address, 100);
+    // saleLock enabled
+    await token.setSaleLock(true);
+    // mint some tokens
+    const result = await token.mint(accounts[0], 100);
+    // validate balance
+    let balance0 = await token.balanceOf(accounts[0]);
+    assert.equal(balance0.toNumber(), 100);
+    // try to send from owner should work
+    await token.transfer(accounts[1], 100);
+    // and to send back shouldn't work
+    await token.transfer(accounts[0], 100, { from: accounts[1] }).should.be.rejectedWith('revert');
+  });
+
+  it('should allow non-owners to transfer while sale unlocked', async function () {
+    // initialize contract
+    await token.initialize(controller.address, 100);
+    // mint some tokens
+    const result = await token.mint(accounts[0], 100);
+    // validate balance
+    let balance0 = await token.balanceOf(accounts[0]);
+    assert.equal(balance0.toNumber(), 100);
+    // try to send from owner should work
+    await token.transfer(accounts[1], 100);
+    // validate balance
+    let balance1 = await token.balanceOf(accounts[1]);
+    assert.equal(balance1.toNumber(), 100);
+    // and to send back shouldn't work
+    await token.transfer(accounts[0], 100, { from: accounts[1] });
+    // validate balance
+    balance = await token.balanceOf(accounts[0]);
+    assert.equal(balance.toNumber(), 100);
+  });
+
+  it('should allow sale address to transfer while sale locked', async function () {
+    // initialize contract
+    await token.initialize(controller.address, 100);
+    // saleLock enabled
+    await token.setSaleLock(true);
+    // mint some tokens
+    const result = await token.mint(accounts[0], 100);
+    // validate balance
+    let balance0 = await token.balanceOf(accounts[0]);
+    assert.equal(balance0.toNumber(), 100);
+    // try to send from owner should work
+    await token.transfer(accounts[1], 100);
+    // validate balance
+    let balance1 = await token.balanceOf(accounts[1]);
+    assert.equal(balance1.toNumber(), 100);
+    //make accounts[1] the saleAddr
+    token.setSaleAddr(accounts[1]);
+    // and since accounts[1] is the saleAddr, to send back should work too
+    token.transfer(accounts[0], 100, { from: accounts[1] })
+    // validate balance
+    balance = await token.balanceOf(accounts[0]);
+    assert.equal(balance.toNumber(), 100);
+  });
+
+  it('only the owner and saleAddr can set and modify allowances while the sale is locked', async function () {
+    let owner = accounts[0];
+    let saleAddr = accounts[1];
+    let other = accounts[2];
+    let receiver = accounts[3];
+    // initialize contract
+    await token.initialize(controller.address, 1000);
+    // saleLock enabled and set by owner
+    await token.setSaleLock(true);
+    await token.setSaleAddr(saleAddr);
+    // mint some tokens
+    await token.mint(owner, 100);
+    await token.mint(saleAddr, 100);
+    await token.mint(other, 100);
+    // try to approve by non-owner should be rejected, but work for owner and sale
+    await token.approve(receiver,20);
+    await token.approve(receiver,20, { from: saleAddr });
+    await token.approve(receiver,20, { from: other }).should.be.rejectedWith('revert');
+    // check allowances
+    let ownerAllow = await token.allowance(owner, receiver);
+    assert.equal(ownerAllow,20);
+    let saleAllow = await token.allowance(saleAddr, receiver);
+    assert.equal(saleAllow,20);
+    let otherAllow = await token.allowance(other, receiver);
+    assert.equal(otherAllow,0);
+    //try to increase/decrease allowances
+    await token.increaseApproval(receiver,20);
+    await token.decreaseApproval(receiver,10, { from: saleAddr });
+    // re-check allowances
+    ownerAllow = await token.allowance(owner, receiver);
+    assert.equal(ownerAllow,40);
+    saleAllow = await token.allowance(saleAddr, receiver);
+    assert.equal(saleAllow,10);
+    otherAllow = await token.allowance(other, receiver);
+    assert.equal(otherAllow,0);
+    // receiver can't transferFrom owner, sale is Locked
+    token.transferFrom(owner, receiver, 10, { from: receiver }).should.be.rejectedWith('revert');
+    // saleLock disabled by owner
+    await token.setSaleLock(false);
+    // receiver transferFrom owner to himself
+    token.transferFrom(owner, receiver, 10, { from: receiver });
+    // re-check allowance
+    ownerAllow = await token.allowance(owner, receiver);
+    assert.equal(ownerAllow,30);
+    // check final balances
+    let balanceOwner = await token.balanceOf(owner);
+    assert.equal(balanceOwner.toNumber(), 90);
+    let balanceReceiver = await token.balanceOf(receiver);
+    assert.equal(balanceReceiver.toNumber(), 10);
   });
 
 });

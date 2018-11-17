@@ -4,28 +4,28 @@ import "./Controller.sol";
 
 contract LockedToken is Controller {
 
-    address public saleAddr;
-    bool public saleLock = true;
+    mapping(address => bool) public authorized;
+    bool public lock = true;
 
     /**
      * @dev Modified modifier to make a function callable only when the contract
      * is not paused or if the msg.sender is the defined sale contract.
      */
-    modifier whenNotLockedOrSale() {
-      require(msg.sender == owner || !saleLock || (saleAddr != address(0) && msg.sender == saleAddr));
+    modifier whenNotLockedOrAuthorized() {
+      require(msg.sender == owner || !lock || authorized[msg.sender]);
       _;
     }
 
     constructor() public {}
 
-    function setSaleAddr(address _saleAddr) public onlyOwner returns (bool) {
-        require(saleAddr != _saleAddr,"That is already the current saleAddr");
-        saleAddr = _saleAddr;
+    function setAuthorized(address _addr, bool _status) public onlyOwner returns (bool) {
+        require(authorized[_addr] != _status,"That is already the current status");
+        authorized[_addr] = _status;
     }
 
-    function setSaleLock(bool _saleLock) public onlyOwner returns (bool) {
-        require(saleLock != _saleLock,"That value does not change saleLock");
-        saleLock = _saleLock;
+    function setLock(bool _lock) public onlyOwner returns (bool) {
+        require(lock != _lock,"That is already the current status");
+        lock = _lock;
     }
 
     function transfer(
@@ -33,7 +33,7 @@ contract LockedToken is Controller {
       uint256 _value
     )
       public
-      whenNotLockedOrSale
+      whenNotLockedOrAuthorized
       returns (bool)
     {
       return super.transfer(_to, _value);
@@ -45,7 +45,7 @@ contract LockedToken is Controller {
       uint256 _value
     )
       public
-      whenNotLockedOrSale
+      whenNotLockedOrAuthorized
       returns (bool)
     {
       return super.transferFrom(_from, _to, _value);
@@ -56,7 +56,7 @@ contract LockedToken is Controller {
       uint256 _value
     )
       public
-      whenNotLockedOrSale
+      whenNotLockedOrAuthorized
       returns (bool)
     {
       return super.approve(_spender, _value);
@@ -67,7 +67,7 @@ contract LockedToken is Controller {
       uint _addedValue
     )
       public
-      whenNotLockedOrSale
+      whenNotLockedOrAuthorized
       returns (bool success)
     {
       return super.increaseApproval(_spender, _addedValue);
@@ -78,7 +78,7 @@ contract LockedToken is Controller {
       uint _subtractedValue
     )
       public
-      whenNotLockedOrSale
+      whenNotLockedOrAuthorized
       returns (bool success)
     {
       return super.decreaseApproval(_spender, _subtractedValue);

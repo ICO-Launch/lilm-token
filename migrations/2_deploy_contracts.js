@@ -16,7 +16,7 @@ module.exports = async function(deployer) {
     // use binding
     await token.initialize(controller.address, initCap*(10**decimals));
     // saleLock enabled
-    await token.setSaleLock(true);
+    await token.setLock(true);
     // check result
     let cap = await token.cap();
     console.log(cap.toNumber());

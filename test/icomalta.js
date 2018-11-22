@@ -234,14 +234,14 @@ contract('Proxy', (accounts) => {
         it('only the owner can lock/unlock the sale', async function () {
             // initialize contract
             await token.initialize(controller.address, 100);
-            // try to lock by non-owner should be rejected
-            await token.setLock(true, { from: accounts[1] }).should.be.rejectedWith('revert');
-            // try to unlock when already unlocked should be rejected
-            await token.setLock(false).should.be.rejectedWith('revert');
-            // saleLock enabled by owner
-            await token.setLock(true);
             // try to unlock by non-owner should be rejected
-            await token.setLock(false, { from: accounts[1] }).should.be.rejectedWith('revert');
+            await token.setUnlock(true, { from: accounts[1] }).should.be.rejectedWith('revert');
+            // try to lock when already locked should be rejected
+            await token.setUnlock(false).should.be.rejectedWith('revert');
+            // lock enabled by owner
+            await token.setUnlock(true);
+            // try to lock by non-owner should be rejected
+            await token.setUnlock(false, { from: accounts[1] }).should.be.rejectedWith('revert');
         });
 
         it('only the owner can authorize', async function () {
@@ -266,8 +266,6 @@ contract('Proxy', (accounts) => {
         it('should allow the owner to transfer while sale locked', async function () {
             // initialize contract
             await token.initialize(controller.address, 100);
-            // saleLock enabled
-            await token.setLock(true);
             // mint some tokens
             const result = await token.mint(accounts[0], 100);
             // validate balance
@@ -283,8 +281,6 @@ contract('Proxy', (accounts) => {
         it('should not allow non-owners to transfer while sale locked', async function () {
             // initialize contract
             await token.initialize(controller.address, 100);
-            // saleLock enabled
-            await token.setLock(true);
             // mint some tokens
             const result = await token.mint(accounts[0], 100);
             // validate balance
@@ -299,6 +295,8 @@ contract('Proxy', (accounts) => {
         it('should allow non-owners to transfer while sale unlocked', async function () {
             // initialize contract
             await token.initialize(controller.address, 100);
+            // saleLock enabled
+            await token.setUnlock(true);
             // mint some tokens
             const result = await token.mint(accounts[0], 100);
             // validate balance
@@ -319,8 +317,8 @@ contract('Proxy', (accounts) => {
         it('should allow sale address to transfer while sale locked', async function () {
             // initialize contract
             await token.initialize(controller.address, 100);
-            // saleLock enabled
-            await token.setLock(true);
+            // unlock token
+            await token.setUnlock(true);
             // mint some tokens
             const result = await token.mint(accounts[0], 100);
             // validate balance
@@ -347,8 +345,6 @@ contract('Proxy', (accounts) => {
             let receiver = accounts[3];
             // initialize contract
             await token.initialize(controller.address, 1000);
-            // Lock enabled and set by owner
-            await token.setLock(true);
             await token.setAuthorized(authorized, true);
             // mint some tokens
             await token.mint(owner, 100);
@@ -377,8 +373,8 @@ contract('Proxy', (accounts) => {
             assert.equal(otherAllow,0);
             // receiver can't transferFrom owner, sale is Locked
             token.transferFrom(owner, receiver, 10, { from: receiver }).should.be.rejectedWith('revert');
-            // saleLock disabled by owner
-            await token.setLock(false);
+            // unlock by owner
+            await token.setUnlock(true);
             // receiver transferFrom owner to himself
             token.transferFrom(owner, receiver, 10, { from: receiver });
             // re-check allowance

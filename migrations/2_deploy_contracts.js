@@ -15,8 +15,6 @@ module.exports = async function(deployer) {
     let token = Controller.at(proxy.address);
     // use binding
     await token.initialize(controller.address, initCap*(10**decimals));
-    // saleLock enabled
-    await token.setLock(true);
     // check result
     let cap = await token.cap();
     console.log(cap.toNumber());
